@@ -1,7 +1,10 @@
 program quantSolver 
-use laplace  
+use heatEquation  
 implicit none 
-real :: start, finish
+REAL :: start, finish
+CHARACTER (len =100) cal_type 
+INTEGER :: n,m
+REAL*8  :: lambda
 
 
              write(*,*) "************************************************"
@@ -10,9 +13,25 @@ real :: start, finish
              write(*,*) "****************SOLVER**************************"
              write(*,*) "************************************************"
 
-             call cpu_time(start)
+             open(unit=12, file="fichier.cal", form="formatted")
+             
+             
+             read(12,*) cal_type
 
-             call start_laplace()
+              
+             if ( cal_type == "HEAT_EQUATION") then 
+                   read(12,*) n 
+                   read(12,*) m
+                   read(12,*) lambda 
+             else   
+                   write(*,*) "calculation label unknown"
+                   CALL EXIT(1)  
+             endif 
+
+             close(12) 
+
+             call cpu_time(start)
+             call start_solver(n,m,lambda)
 
              call cpu_time(finish)
  
