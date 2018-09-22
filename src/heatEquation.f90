@@ -2,33 +2,63 @@ module heatEquation
     use linearSystemSolver
       implicit none 
 
-         INTEGER  :: Nt
-         REAL*8, dimension(:,:), allocatable :: matrix
-         REAL*8, dimension(:), allocatable  :: cl_tab
-         REAL*8, dimension(:), allocatable :: x
-         REAL*8, dimension(:), allocatable :: cl_north
-         REAL*8, dimension(:), allocatable :: cl_south
-         REAL*8, dimension(:), allocatable :: cl_east
-         REAL*8, dimension(:), allocatable :: cl_west
+         
+         REAL  ::  dim_x , delta_x,  dim_y,  delta_y , dim_t, delta_t 
+         INTEGER  :: n,m,Nt,time_step
+         REAL  :: alpha, lambda,rho,dif,cap 
+         REAL, dimension(:,:), allocatable :: matrix
+         REAL, dimension(:), allocatable  :: cl_tab
+         REAL, dimension(:), allocatable :: x
+         REAL  ::  cl_north,cl_south,cl_east,cl_west
  
-contains 
+contains
+
+
+subroutine read_data_heq( ) 
+      read(12,*) dim_x , n 
+      read(12,*) dim_y,  m 
+      read(12,*) dim_t, time_step 
+      read(12,*) lambda 
+      read(12,*) rho
+      read(12,*) cap
+      read(12,*) cl_north, cl_south, cl_east, cl_west
+ 
+      n = n-2
+      m = m-2 
+
+      !n = int(dim_x/delta_x) -2 
+      !m = int(dim_y/delta_y) -2
+      !time_step = int(dim_t/delta_t) 
+   
+       delta_x = dim_x/(1.0*n) 
+       delta_y = dim_y/(1.0*m) 
+       delta_t = dim_t/(1.0*time_step) 
+
+      dif = lambda/(rho*cap) 
+      alpha = (dif*delta_t)/(2.0*delta_x*delta_x)  
+  
+ write(*,*) "thermal diffusivity :" , dif , "m^2/s"
+
+
+ write(*,*) "coeff :" , alpha 
+
+ 
+
+
+end subroutine 
 
         
-  subroutine start_solver(n,m,lambda)
-       INTEGER, INTENT(IN) :: n 
-       INTEGER, INTENT(IN) :: m 
-       REAL*8, INTENT(IN) :: lambda
+  subroutine start_solver()
     
-             write(*,*) "****************************************"
-             write(*,*) "****************************************"
-             write(*,*) "**********2D HEAT EQUATION**************"
-             write(*,*) "****************************************"
-             write(*,*) "****************************************"
-     
-             Nt = n*m
+             write(*,*) "***********************************************************"
+             write(*,*) "*******************2D HEAT EQUATION************************"
+             write(*,*) "***********************************************************"
+          
+              write(*,*) "taille :",n,m 
 
+              Nt = n*m  
 
-            call adi_method(n,m,lambda)
+            call adi_method()
 
             call clear_memory()
 
@@ -36,50 +66,74 @@ contains
 
 
 !*************************************************************************
-! We use the Nicholson scheme for two spatial heat equation. More 
-! preciesly we use the adi method because of the numercal instabilities
+! We use the Crank-Nicolson scheme for two spatial heat equation. More 
+! precisely we use the adi method because of the numerical instabilities
 ! of the previous method. 
 !*************************************************************************
 
-subroutine adi_method(n,m,lambda) 
-INTEGER :: i
-INTEGER, INTENT(IN) ::n,m
-REAL*8, INTENT(IN) :: lambda
+subroutine adi_method() 
+INTEGER :: i,j,k,p,i_step 
+CHARACTER (len=80) :: file_name_output  
+REAL*8 :: temp 
+
+
 
         allocate ( matrix(Nt,Nt) )
-        allocate ( cl_north(m) )
-        allocate ( cl_south(m) )
-        allocate ( cl_east(n) )
-        allocate ( cl_west(n) )
         allocate ( cl_tab(Nt) )
         allocate ( x(Nt) )
 
         
-        x = 0.
+        x = 293.
         cl_tab =0.
-        cl_east =0. 
-        cl_west =0. 
-        cl_south =0. 
-        cl_north =0.
 
-        do i=1,m 
-        cl_north(i) = 20 
-        cl_south(i) = 12
-        enddo
+        cl_north = cl_north +273
+        cl_south = cl_south +273
+        cl_east  = cl_east + 273
+        cl_west  = cl_west + 273
 
-        do i=1,n
-        cl_east(i) = 15
-        cl_west(i) = 14
-        enddo 
-          
-        CALL adi_init(n,m,lambda,1) 
-        CALL lapack_solver(matrix,cl_tab,Nt,1)
-        CALL adi_init(n,m,lambda,2)
-        CALL lapack_solver(matrix,cl_tab,Nt,1)
 
-        x = cl_tab
+        do i_step = 0,time_step 
 
-        write(*,*) x(:)
+         write(File_name_output,'(A,I3.3,A)') 'data/GenericName',i_step,'.ext'
+         open(unit=13,file = File_name_output)  
+
+         if (i_step == 0 ) then 
+                 CALL  write_mesh(13)
+
+                 write(*,*) "calculation time step", i_step , "finished" 
+         else  
+
+
+
+        call adi_init(1) 
+        !call gaussJordanMethod(matrix,cl_tab,Nt)
+        call lapack_solver(matrix,cl_tab,Nt,1) 
+        
+        x = cl_tab 
+
+        call adi_init(2) 
+       ! call gaussJordanMethod(matrix,cl_tab,Nt)
+        call lapack_solver(matrix,cl_tab,Nt,1)
+
+        
+
+
+        do i=1,n 
+          do j=1,m
+           
+              k = (i-1)*m + j 
+              p = (j-1)*n + i
+
+              x(k) = cl_tab(p) 
+         enddo 
+        enddo       
+ 
+      call write_mesh(13) 
+      
+           write(*,*) "calculation time step", i_step , "finished" 
+    endif
+
+ enddo 
 
 end subroutine
 
@@ -91,95 +145,158 @@ end subroutine
 !step t=t+1/2 and with the result of this operation we compute the solution 
 !**************************************************************************
 
-subroutine adi_init(n,m,lambda,time_step)           
-       INTEGER :: i,j,k
-       INTEGER, INTENT(IN) ::n,m
-       REAL*8, INTENT(IN) :: lambda
-       INTEGER,INTENT(IN) :: time_step 
-       write(*,*) "***********initialization step***************" 
-       write(*,*) "****************ADI METHOD*******************" 
+subroutine adi_init(step)           
+       INTEGER :: i,j,k,p
+       INTEGER,INTENT(IN) :: step 
+     !  write(*,*) "***********initialization step***************" 
+     !  write(*,*) "****************ADI METHOD*******************" 
 
-                
+     if ( step /= 1 .and. step /=2 ) then 
+
+             write(0,*) " error :" 
+             write(0,*) "step not defined"
+             write(0,*) "in adi_init subroutine : heatEquation.f90 "
+             CALL exit(0) 
+     endif 
+
         matrix =0.
+        cl_tab =0.
        
 
-     
-
-
-!  Fist we resolve the second x derivative in the explicitly way
-!  We store the triadiagonal matrix for this case 
-!  ( 1 + 4*lambda      -2*lambda          0     ---------   0    -----   0    )    
-!  ( -2*lambda         1 + 4*lambda   -2*lambda ---------   0    .....   0    )
-!  (    -                                   --                                )
-!  (    -                                             --                      )
-!  (    -                                                    --               )
-!  (    0 -------------------                     -2*lambda      1 + 4*lambda )    
-!
-! multiple of lambda -> lambda = 2*lambda 
 
     do i=1,Nt
       do j=1,Nt
 
-        ! matrix A 
          if ( j == i ) then 
-             matrix(i,j) = 1.0 +4.0*lambda  
+             matrix(i,j) = 1.0 +4.0*alpha  
           end if
-         if (j == i+1 .and. i < Nt ) then  
-         matrix(i,j) = -2.0*lambda 
+         if (j == i+1 .and. i < Nt .and. modulo(i,m) /= 0 ) then  
+         matrix(i,j) = -2.0*alpha 
           end if
-          if (  j == i-1 .and. i>1) then 
-          matrix(i,j) = -2.0*lambda 
+          if (  j == i-1 .and. i>1 .and. modulo(j,m) /=0) then 
+          matrix(i,j) = -2.0*alpha 
           end if
      enddo
     enddo
+ 
 
-         
-! And the right-hand side of the equation :
-        do i=1,n 
-          do j=1,m 
-            k = (i-1)*m +j 
-! time part  
-            cl_tab(k) = cl_tab(k) + (1.0 - 2.0*lambda)*x(k) 
 
-           if (time_step == 1) then             
-! right side of the grid 
-                if (j == m) then
-                cl_tab(k) = cl_tab(k) + 2.0*lambda*cl_east(i) + x(k-1)
-! left side of the grid 
-                else if (j == 1) then
-           cl_tab(k) = cl_tab(k) + 2.0*lambda*cl_west(i) + x(k+1) 
-! center of the gride 
-                else 
-           cl_tab(k) = cl_tab(k) + 2.0*lambda*(x(k+1) + x(k-1)) 
-                endif  
-           endif
-        if (time_step == 2) then 
-! upper side of the grid 
-                if (i == 1) then
-                cl_tab(k) = cl_tab(k) + 2.0*lambda*cl_north(j) + x(k+m)
-! lower side of the grid 
-                else if (i == n) then
-           cl_tab(k) = cl_tab(k) + 2.0*lambda*cl_south(j) + x(k-m) 
-! center of the gride 
-                else 
-           cl_tab(k) = cl_tab(k) + 2.0*lambda*(x(k+m) + x(k-m)) 
-                endif  
-           endif
-          enddo
-        enddo
+    do i =1,n
+       do j=1,m 
+      
+
+          k = (i-1)*m +j
+
+     if ( step == 1) then 
+
+          cl_tab(k) = (1 - 4.0*alpha)*x(k) 
+
+! top side of the point  
+          if ( i == 1) then       
+          cl_tab(k) = cl_tab(k) + 2.0*alpha*cl_north 
+          else
+          cl_tab(k) = cl_tab(k) + 2.0*alpha*x(k-m)
+          endif  
+! lower side of the point 
+          if ( i == n ) then 
+          cl_tab(k) = cl_tab(k) + 2.0*alpha*cl_south  
+          else
+          cl_tab(k) = cl_tab(k) + 2.0*alpha*x(k+m)
+          endif  
+! left side of the point
+          if ( j == 1 ) then 
+          cl_tab(k) = cl_tab(k) +  2.0*alpha*cl_west
+          endif 
+! right side of the point            
+          if ( j == m ) then  
+          cl_tab(k) = cl_tab(k)  + 2.0*alpha*cl_east  
+          endif 
+  endif 
+
+        if ( step == 2 ) then 
+
+           p = (j-1)*n + i
+
+           cl_tab(p) = (1 - 4.0*alpha)*x(k)
+
+! top side of the point 
+          if ( i == 1) then             
+          cl_tab(p) = cl_tab(p) + 2.0*alpha*cl_north  
+          endif  
+! lower side of the point  
+          if ( i == n ) then 
+          cl_tab(p) = cl_tab(p)  + 2.0*alpha*cl_south 
+          endif 
+! left side of the point 
+          if ( j == 1 ) then 
+          cl_tab(p) = cl_tab(p) + 2.0*alpha*cl_west
+          else 
+          cl_tab(p) = cl_tab(p) + 2.0*alpha*x(k-1) 
+          endif 
+! right side of the point            
+          if ( j == m ) then  
+          cl_tab(p) = cl_tab(p) + 2.0*alpha*cl_east    
+          else
+          cl_tab(p) = cl_tab(p) + 2.0*alpha*x(k+1)     
+          endif 
+  
+     endif 
+   
+           
+         enddo    
+           enddo
+
+ 
            
 end subroutine 
 
 
+       subroutine write_mesh(out_unit) 
+       INTEGER :: i,j,k
+       INTEGER, INTENT(IN) :: out_unit  
+
+           do i=0,n+1 
+             do j=0,m+1
+
+                    k = (i-1)*m + j 
+
+                  if (i == 0 )  then  
+                  write(out_unit,*)  i,j, cl_north 
+
+                  else if ( i == n+1 ) then   
+                         
+                  write(out_unit,*) i,j, cl_south 
+
+                 else if ( j == 0 ) then 
+
+                  write(out_unit,*) i,j, cl_west 
+
+                 else if ( j == m+1 ) then 
+
+                  write(out_unit,*) i,j, cl_east 
+
+                 else 
+
+                  write(out_unit,*)  i,j, x(k)
+
+               endif
+
+             enddo
+           enddo   
+                    
+
+
+       end subroutine         
+ 
 
     subroutine clear_memory() 
      deallocate(x)
      deallocate(cl_tab) 
      deallocate(matrix) 
-     deallocate( cl_south ) 
-     deallocate( cl_north ) 
-     deallocate( cl_east ) 
-     deallocate( cl_west )
+  !   deallocate( cl_south ) 
+  !   deallocate( cl_north ) 
+  !   deallocate( cl_east ) 
+  !   deallocate( cl_west )
     end subroutine  
 
 

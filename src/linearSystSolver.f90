@@ -25,7 +25,7 @@ implicit none
 !        DATA  nrhs /1/, maxfct /1/, mnum /1/
 
 ! External Subroutines ..
-      EXTERNAL         DGESV
+      EXTERNAL         SGESV
 
 contains 
 
@@ -120,11 +120,11 @@ contains
 ! end subroutine
 
 
- subroutine lapack_solver(matrix,cl_tab,Nt,NRHS) 
+subroutine lapack_solver(matrix,cl_tab,Nt,NRHS) 
       ! Parameters ..
       INTEGER, INTENT(IN) :: NRHS, Nt
-      REAL*8 :: matrix(:,:)
-      REAL*8 :: cl_tab(:)
+      REAL :: matrix(:,:)
+      REAL :: cl_tab(:)
       INTEGER :: LDA , LDB 
       ! local scalar
       INTEGER ::  INFO 
@@ -135,14 +135,74 @@ contains
      LDB = Nt
 
       !!  Executable Statements ..
-      WRITE(*,*)'DGESV Example Program Results'
+      WRITE(*,*)'SGESV Example Program Results'
 !
 !     Solve the equations A*X = B.
 !
-      CALL DGESV( Nt, NRHS, matrix, LDA, IPIV, cl_tab, LDB, INFO )
+      CALL SGESV( Nt, NRHS, matrix, LDA, IPIV, cl_tab, LDB, INFO )
 
   
-    end subroutine 
+end subroutine
+
+subroutine  gaussJordanMethod(matrix,cl_tab,Nt) 
+          INTEGER :: i,j
+          INTEGER :: k,r,p
+          REAL :: max_,tmp,tmp2,pivot
+          INTEGER, INTENT(IN) :: Nt
+          REAL :: matrix(:,:) 
+          REAL :: cl_tab(:) 
+          
+
+          write(*,*) "start matrix inversion"   
+
+ 
+          r=0 ! Initialization of the pivot row 
+       
+        do j=1,Nt ! loop of all column   
+           max_ = 0.0
+
+           !step one, find the largest value of the row j  
+
+           do i=r+1,Nt ! loop of the row j to find the max 
+              
+               if ( abs(matrix(i,j)) > abs(max_) ) then 
+               max_ = matrix(i,j) 
+               k=i
+               end if
+           end do 
+         
+           ! step two, pivoting 1
+           ! find a row with the largest pivoting element      
+
+           if ( max_ /= 0) then 
+           r=r+1 
+           matrix(k,:) = matrix(k,:)/max_ 
+            cl_tab(k) =  cl_tab(k)/max_
+
+            do p=1,Nt  
+            tmp = matrix(k,p)
+            matrix(k,p) = matrix(r,p)
+            matrix(r,p) = tmp
+            end do 
+          
+            tmp2 =  cl_tab(k)
+             cl_tab(k) = cl_tab(r)
+             cl_tab(r) =tmp2
+            
+           do i=1,Nt 
+             if (i /= r) then
+             pivot = matrix(i,j) 
+             matrix(i,:) = matrix(i,:) - pivot*matrix(r,:)
+              cl_tab(i) =  cl_tab(i) -  pivot* cl_tab(r)
+
+            end if  
+           end do 
+         end if 
+       end do 
+
+end subroutine  
+
+ 
 
 
 end module 

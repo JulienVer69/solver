@@ -2,39 +2,41 @@ program quantSolver
 use heatEquation  
 implicit none 
 REAL :: start, finish
-CHARACTER (len =100) cal_type 
-INTEGER :: n,m
-REAL*8  :: lambda
+CHARACTER (len =100) cal_type
+character(len=100) :: file_name
+!INTEGER :: n,m
+!REAL*8  :: lambda
 
+call get_command_argument(1, file_name)
 
-             write(*,*) "************************************************"
-             write(*,*) "************************************************"
-             write(*,*) "******PARTIAL DIFFERENTIAL EQUATIONS************"
-             write(*,*) "****************SOLVER**************************"
+open(unit=12, file=file_name, form="formatted")
+
+             write(*,*) "*****************************************************"
+             write(*,*) "***********PARTIAL DIFFERENTIAL EQUATIONS************"
+             write(*,*) "*********************SOLVER**************************"
              write(*,*) "************************************************"
 
-             open(unit=12, file="fichier.cal", form="formatted")
              
+         call cpu_time(start)
              
              read(12,*) cal_type
 
               
-             if ( cal_type == "HEAT_EQUATION") then 
-                   read(12,*) n 
-                   read(12,*) m
-                   read(12,*) lambda 
+             if ( cal_type == "HEAT_EQUATION") then  
+                CALL read_data_heq()
+                call start_solver()
+
+
+
              else   
                    write(*,*) "calculation label unknown"
                    CALL EXIT(1)  
              endif 
 
+             call cpu_time(finish)
              close(12) 
 
-             call cpu_time(start)
-             call start_solver(n,m,lambda)
-
-             call cpu_time(finish)
- 
+              
              print '("Time = ",f6.3," seconds.")',finish-start
              write(*,*) "end of the program"
 
