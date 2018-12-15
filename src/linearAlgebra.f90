@@ -164,7 +164,7 @@ endif
 allocate ( matrix(m-2,m-2) )
 allocate (tab(m-2))
 
-        do i_step = 1,time_step
+do i_step = 1,time_step
 
 
 allocate ( local_mesh(np,m) )
@@ -183,13 +183,10 @@ allocate ( local_mesh(np,m) )
  local_mesh(2:np-1,1) = mesh_init(2:np-1,1)
 
 
-
 deallocate(mesh_init)
 allocate(mesh_init(m,np))
-mesh_init = .0
 mesh_init(1,:) = cl_north
 mesh_init(m,:) = cl_south 
-
 
 local_mesh_cursor = 1 
 mesh_init_cursor = 2
@@ -231,87 +228,76 @@ do i=0,numprocs-1
          endif        
 enddo 
 
-if (rank == 0 ) then 
- do i = 1,m 
-write(*,*) mesh_init(i,:)
- enddo
- endif 
+
+deallocate(local_mesh)
+allocate(local_mesh(m,np))
+
+           do i =2,niter+1
+               CALL adi_method_init(2,i,tab,matrix)
+               CALL lapack_solver(matrix,tab,m-2,1)
+               local_mesh(2:m-1,i) = tab
+           enddo
 
 
-
-!if ( rank == 0 ) then 
-!  call MPI_Sendrecv(local_mesh(2:4,4:7),3*4,MPI_REAL,1,545,&
-! mesh_init(5:6,1:4),2*4, MPI_REAL,1,546,MPI_COMM_WORLD,status,ierr)
-!endif
-
-!if ( rank == 1 ) then 
-!  call MPI_Sendrecv(local_mesh(2:3,1:4),2*4,MPI_REAL,0,546,&
-! mesh_init(4:6,1:4),3*4, MPI_REAL,0,545,MPI_COMM_WORLD,status,ierr)
-!endif
+ local_mesh(1,:) = mesh_init(1,:)
+ local_mesh(m,:) = mesh_init(m,:)
+ local_mesh(2:np-1,np) = mesh_init(2:np-1,np)
+ local_mesh(2:np-1,1) = mesh_init(2:np-1,1)
 
 
-!if ( rank == 1 ) then 
+deallocate(mesh_init)
+allocate(mesh_init(np,m))
+mesh_init =.0
 
-!write(*,*) "ça marche" 
-      
-!        call MPI_Sendrecv(local_mesh(2:3,1:4),2*4,MPI_REAL,0,rank+101,&
-! mesh_init(2:3,1:4),2*4,MPI_REAL,1,1+101,MPI_COMM_WORLD,status,ierr)
-
-
-!endif 
-
-!deallocate(local_mesh)
-!allocate(local_mesh(m,np))
-
-!           do i =2,niter+1
-!               CALL adi_method_init(2,i,tab,matrix)
-!               CALL lapack_solver(matrix,tab,m-2,1)
-!               local_mesh(2:m-1,i) = tab
-!           enddo
+mesh_init(:,m) = cl_east 
+mesh_init(:,1)  = cl_west 
 
 
-! local_mesh(1,:) = mesh_init(1,:)
-! local_mesh(m,:) = mesh_init(m,:)
-! local_mesh(2:np-1,np) = mesh_init(2:np-1,np)
-! local_mesh(2:np-1,1) = mesh_init(2:np-1,1)
+local_mesh_cursor = 2 
+mesh_init_cursor = 1
+
+do i=0,numprocs-1
+
+   if ( rest /= 0 ) then 
+        if ( i >= rest ) then 
+           niter_send = niter_glob
+        else
+           niter_send = niter_glob +1 
+        endif      
+      else
+           niter_send = niter_glob 
+      endif  
+
+! Déplacement horizontal sur la grille : mesh_init  
+        
+         mb = local_mesh_cursor 
+         local_mesh_cursor = mb + niter_send  
+         me = local_mesh_cursor - 1  
+        
+! Déplacement vertical sur la grille : local_mesh  
+
+         nb = mesh_init_cursor    
+         mesh_init_cursor = nb + niter_send  
+         ne =  mesh_init_cursor +1 
 
 
-!deallocate(mesh_init)
-!allocate(mesh_init(np,m))
+        if ( i == rank ) then   
+           mesh_init(1:np,mb:me) = local_mesh(nb:ne,mb:me)
+        endif  
 
-!mesh_init(:,np) = cl_east 
-!mesh_init(:,1)  = cl_west 
+ if (rank /= i) then 
 
-
-!do i=0,numprocs-1
-
-!      if ( rest /= 0 ) then  
-!        if ( i >= rest ) then 
-!           niter_send = niter_glob
-!        else
-!           niter_send = niter_glob +1 
-!        endif      
-!      endif 
- 
-!        nb = i*niter_send +2
-!        ne = nb + niter_send-1 
-
-!        if ( i == rank ) then   
-!         mesh_init(1:np,nb:ne) = local_mesh(nb-1:ne+1,2:np-1)
-!          endif  
-
-!   if (rank /= i) then 
-!  call MPI_Sendrecv(local_mesh(nb-1:ne+1,2:np-1),niter_send*np,MPI_REAL,i,rank+101,&
-!  mesh_init(1:np,nb:ne),niter_send*np, MPI_REAL,i,i+101,MPI_COMM_WORLD,status,ierr)
-!   endif        
-!enddo
+              call MPI_Sendrecv(local_mesh(nb:ne,2:np-1),niter*(niter_send+2),MPI_REAL,i,rank+101,&
+              mesh_init(1:np,mb:me),niter_send*(niter+2), MPI_REAL,i,i+101,MPI_COMM_WORLD,status,ierr)
+       endif
+enddo  
 
 
 !if (rank == 0 ) then 
 ! do i = 1,np 
 !write(*,*) mesh_init(i,:)
-! enddo
-! endif 
+!enddo
+!endif 
 
  
 deallocate( local_mesh )
