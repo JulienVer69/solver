@@ -11,7 +11,8 @@ module linearAlgebra
       REAL, dIMENSION(:,:), ALLOCATABLE :: mesh_sol   
       REAL  ::  cl_north,cl_south,cl_east,cl_west
       REAL  :: alpha, lambda,rho,dif,cap
-      REAL  ::  dim_x , delta_x, dim_y,  delta_y , dim_t, delta_t, time_step 
+      REAL  ::  dim_x , delta_x, dim_y,  delta_y , dim_t, delta_t
+      INTEGER :: time_step  
       INTEGER :: WRITE_UNIT
       CHARACTER (len=80) :: file_name_output         
       INTEGER :: rest 
@@ -147,7 +148,7 @@ REAL, dimension(:,:), allocatable ::  local_mesh
 REAL, dimension(:,:), allocatable ::  matrix 
 INTEGER :: i,j,i_step,mini,maxi  
 REAL, dimension(:), allocatable ::  tab
-INTEGER :: nb,ne,mb,me 
+INTEGER :: nb,ne,mb,me  
 INTEGER :: niter_send,np_send 
 INTEGER :: mesh_init_cursor, local_mesh_cursor 
 
@@ -156,25 +157,23 @@ write(*,*) "method of resolution : Alternating direction implicit method (2-D)"
 write(*,*) "------------------------------------------------------------------"
 endif 
 
-  WRITE_UNIT = rank+100   
-         write(File_name_output,'(A,I3.3,A)') 'init/GenericName',rank,'.ext'
-       
-         open(unit=WRITE_UNIT,file = File_name_output)
+
+
 
 allocate ( matrix(m-2,m-2) )
 allocate (tab(m-2))
 
-do i_step = 1,time_step
+do i_step = 1,time_step 
 
 
 allocate ( local_mesh(np,m) )
-
 
           do i =2,niter+1
                CALL adi_method_init(1,i,tab,matrix)
                CALL lapack_solver(matrix,tab,n-2,1)
                local_mesh(i,2:m-1) = tab
            enddo
+
 
 
  local_mesh(1,:) = mesh_init(1,:)
@@ -185,6 +184,7 @@ allocate ( local_mesh(np,m) )
 
 deallocate(mesh_init)
 allocate(mesh_init(m,np))
+mesh_init =.0
 mesh_init(1,:) = cl_north
 mesh_init(m,:) = cl_south 
 
@@ -219,38 +219,38 @@ do i=0,numprocs-1
 
         if ( i == rank ) then
                  mesh_init(nb:ne,1:np) = local_mesh(2:np-1,mb:me)
-        endif  
-
-        if (rank /= i) then 
-
+        else           
                 call MPI_Sendrecv(local_mesh(2:np-1,mb:me),niter*(niter_send+2),MPI_REAL,i,rank+101,&
                 mesh_init(nb:ne,1:niter+2),niter_send*(niter+2), MPI_REAL,i,i+101,MPI_COMM_WORLD,status,ierr)
-         endif        
+        endif 
 enddo 
+
+
 
 
 deallocate(local_mesh)
 allocate(local_mesh(m,np))
 
+
            do i =2,niter+1
                CALL adi_method_init(2,i,tab,matrix)
                CALL lapack_solver(matrix,tab,m-2,1)
                local_mesh(2:m-1,i) = tab
-           enddo
+            enddo
 
 
- local_mesh(1,:) = mesh_init(1,:)
- local_mesh(m,:) = mesh_init(m,:)
- local_mesh(2:np-1,np) = mesh_init(2:np-1,np)
- local_mesh(2:np-1,1) = mesh_init(2:np-1,1)
+local_mesh(1,:) = mesh_init(1,:)
+local_mesh(m,:) = mesh_init(m,:)
+local_mesh(2:m-1,np) = mesh_init(2:m-1,np)
+local_mesh(2:m-1,1) = mesh_init(2:m-1,1)
 
 
 deallocate(mesh_init)
 allocate(mesh_init(np,m))
-mesh_init =.0
 
 mesh_init(:,m) = cl_east 
 mesh_init(:,1)  = cl_west 
+
 
 
 local_mesh_cursor = 2 
@@ -282,32 +282,26 @@ do i=0,numprocs-1
 
 
         if ( i == rank ) then   
-           mesh_init(1:np,mb:me) = local_mesh(nb:ne,mb:me)
-        endif  
-
- if (rank /= i) then 
-
+           mesh_init(1:np,mb:me) = local_mesh(nb:ne,2:np-1)
+        else  
               call MPI_Sendrecv(local_mesh(nb:ne,2:np-1),niter*(niter_send+2),MPI_REAL,i,rank+101,&
               mesh_init(1:np,mb:me),niter_send*(niter+2), MPI_REAL,i,i+101,MPI_COMM_WORLD,status,ierr)
-       endif
+        endif 
 enddo  
 
-
-!if (rank == 0 ) then 
-! do i = 1,np 
-!write(*,*) mesh_init(i,:)
-!enddo
-!endif 
-
- 
 deallocate( local_mesh )
+
+!if ( rank ==0 ) then 
+! do ipp=1,np  
+!      write(*,*) mesh_init(ipp,:)
+!enddo 
+!endif
 
  if ( rank == 0 ) then 
  write(*,*) "calculation time step", i_step , "finished"
 endif 
 
 enddo 
-
 
  deallocate( matrix )
  deallocate( tab )

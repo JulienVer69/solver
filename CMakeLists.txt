@@ -12,6 +12,17 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 #
 file(GLOB_RECURSE sources  src/*.f90 )
 add_executable(linear_solver ${sources} )
+install(TARGETS linear_solver DESTINATION bin)
+
+
+# mpi -------------------------------------------
+find_package(MPI REQUIRED)
+add_definitions(${MPI_Fortran_COMPILE_FLAGS})
+include_directories(${MPI_Fortran_INCLUDE_PATH})
+link_directories(${MPI_Fortran_LIBRARIES})
+target_link_libraries(linear_solver ${MPI_Fortran_LIBRARIES})
+
+# end mpi statment ---------------------------------------------------------
 
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
     set(dialect "-ffree-form -std=f2008 -fimplicit-none")
@@ -26,7 +37,6 @@ if(CMAKE_Fortran_COMPILER_ID MATCHES "PGI")
     set(dialect "-Mfreeform -Mdclchk -Mstandard -Mallocatable=03")
     set(bounds "-C")
 endif()
-
 
 find_package(MKL)
 if(MKL_FOUND)

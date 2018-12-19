@@ -134,8 +134,6 @@ subroutine lapack_solver(matrix,cl_tab,Nt,NRHS)
      LDA = Nt
      LDB = Nt
 
-      !!  Executable Statements ..
-      WRITE(*,*)'SGESV Example Program Results'
 !
 !     Solve the equations A*X = B.
 !
@@ -151,9 +149,7 @@ subroutine  gaussJordanMethod(matrix,cl_tab,Nt)
           INTEGER, INTENT(IN) :: Nt
           REAL :: matrix(:,:) 
           REAL :: cl_tab(:) 
-          
 
-          write(*,*) "start matrix inversion"   
 
  
           r=0 ! Initialization of the pivot row 
