@@ -1,6 +1,7 @@
 module linearAlgebra  
     use linearSystemSolver
-    use para 
+    use para
+    use writeData
       IMPLICIT NONE  
 
 
@@ -13,8 +14,6 @@ module linearAlgebra
       REAL  :: alpha, lambda,rho,dif,cap
       REAL  ::  dim_x , delta_x, dim_y,  delta_y , dim_t, delta_t
       INTEGER :: time_step  
-      INTEGER :: WRITE_UNIT
-      CHARACTER (len=80) :: file_name_output         
       INTEGER :: rest 
       
       CONTAINS 
@@ -43,7 +42,6 @@ subroutine read_data(READ_UNIT)
       delta_x = dim_x/(1.0*n) 
       delta_y = dim_y/(1.0*m) 
       delta_t = dim_t/(1.0*time_step) 
-
       dif = lambda/(rho*cap) 
       alpha = (dif*delta_t)/(2.0*delta_x*delta_x) 
 
@@ -88,7 +86,6 @@ endif
             niter = niter_glob 
          endif   
       
-         !write(*,*) "nb d'it : ", niter   
          np = niter+2 
 
 
@@ -99,10 +96,6 @@ endif
 
            call adi_method() 
 
-   
-         
-
-         close(WRITE_UNIT) 
          deallocate(mesh_init)
 
 
@@ -140,30 +133,54 @@ end subroutine
 
 
 subroutine adi_method() 
-!integer i,BUFSIZE, thefile 
-!    parameter (BUFSIZE=100) 
-!    character buf(BUFSIZE) 
-!    integer(kind=MPI_OFFSET_KIND) disp  
+integer BUFSIZE, thefile 
+integer(kind=MPI_OFFSET_KIND) disp  
 REAL, dimension(:,:), allocatable ::  local_mesh
+REAL, dimension(:,:), allocatable ::  mesh_write 
 REAL, dimension(:,:), allocatable ::  matrix 
 INTEGER :: i,j,i_step,mini,maxi  
 REAL, dimension(:), allocatable ::  tab
 INTEGER :: nb,ne,mb,me  
 INTEGER :: niter_send,np_send 
-INTEGER :: mesh_init_cursor, local_mesh_cursor 
+INTEGER :: mesh_init_cursor, local_mesh_cursor, write_cursor  
+INTEGER :: offset  
+INTEGER :: nl,nc,TS,NUMB 
 
 if ( rank == 0 ) then 
 write(*,*) "method of resolution : Alternating direction implicit method (2-D)"
 write(*,*) "------------------------------------------------------------------"
 endif 
 
+! We create a binary file to save the results of the calculation in parallel 
+! each task will write his results in a specific location of the file :
+
+call MPI_FILE_OPEN(MPI_COMM_WORLD, 'testfile', & 
+             MPI_MODE_WRONLY + MPI_MODE_CREATE, & 
+                     MPI_INFO_NULL, thefile, ierr) 
+
+disp = 0 
+
+! meta data  -> time step 
+    call MPI_FILE_WRITE_AT_ALL(thefile,disp,time_step,1, MPI_INTEGER, & 
+                        MPI_STATUS_IGNORE, ierr) 
+
+disp = disp + 4
+
+! meta data  -> number of blocks by time edition
+
+    call MPI_FILE_WRITE_AT_ALL(thefile,disp,numprocs-1,1, MPI_INTEGER, & 
+                        MPI_STATUS_IGNORE, ierr) 
 
 
-
+                
 allocate ( matrix(m-2,m-2) )
 allocate (tab(m-2))
 
+
 do i_step = 1,time_step 
+
+offset = (i_step-1)*(n*m + numprocs*2) + 2
+offset = offset*4
 
 
 allocate ( local_mesh(np,m) )
@@ -175,9 +192,10 @@ allocate ( local_mesh(np,m) )
            enddo
 
 
+! We set the local boundary conditions : 
 
- local_mesh(1,:) = mesh_init(1,:)
- local_mesh(np,:) = mesh_init(np,:)
+ local_mesh(1,:) = mesh_init(1,:)  
+ local_mesh(np,:) = mesh_init(np,:) 
  local_mesh(2:np-1,m) = mesh_init(2:np-1,m)
  local_mesh(2:np-1,1) = mesh_init(2:np-1,1)
 
@@ -219,13 +237,12 @@ do i=0,numprocs-1
 
         if ( i == rank ) then
                  mesh_init(nb:ne,1:np) = local_mesh(2:np-1,mb:me)
+                 write_cursor = nb 
         else           
                 call MPI_Sendrecv(local_mesh(2:np-1,mb:me),niter*(niter_send+2),MPI_REAL,i,rank+101,&
                 mesh_init(nb:ne,1:niter+2),niter_send*(niter+2), MPI_REAL,i,i+101,MPI_COMM_WORLD,status,ierr)
         endif 
 enddo 
-
-
 
 
 deallocate(local_mesh)
@@ -250,8 +267,6 @@ allocate(mesh_init(np,m))
 
 mesh_init(:,m) = cl_east 
 mesh_init(:,1)  = cl_west 
-
-
 
 local_mesh_cursor = 2 
 mesh_init_cursor = 1
@@ -280,7 +295,6 @@ do i=0,numprocs-1
          mesh_init_cursor = nb + niter_send  
          ne =  mesh_init_cursor +1 
 
-
         if ( i == rank ) then   
            mesh_init(1:np,mb:me) = local_mesh(nb:ne,2:np-1)
         else  
@@ -291,11 +305,55 @@ enddo
 
 deallocate( local_mesh )
 
-!if ( rank ==0 ) then 
-! do ipp=1,np  
-!      write(*,*) mesh_init(ipp,:)
-!enddo 
-!endif
+! now we save the results in the binary file 
+ 
+     BUFSIZE = niter
+     nb = 2
+     ne = np-1
+
+    if ( rank == 0 ) then 
+       BUFSIZE = BUFSIZE + 1
+       nb = 1
+       write_cursor = 1
+    endif 
+   if ( rank == numprocs-1) then    
+        BUFSIZE = BUFSIZE + 1 
+        ne = np
+   endif 
+ 
+      disp = (write_cursor-1)*m*4 + offset + rank*8    
+   
+! meta data
+! number of lines in block
+    call MPI_FILE_SET_VIEW(thefile,disp, MPI_INTEGER, & 
+                           MPI_INTEGER, 'native', & 
+                           MPI_INFO_NULL, ierr) 
+    call MPI_FILE_WRITE(thefile,BUFSIZE,1, MPI_INTEGER, & 
+                        MPI_STATUS_IGNORE, ierr) 
+
+                disp = disp + 4
+
+! number of columns in block 
+
+    call MPI_FILE_SET_VIEW(thefile,disp, MPI_INTEGER, & 
+                           MPI_INTEGER, 'native', & 
+                           MPI_INFO_NULL, ierr) 
+    call MPI_FILE_WRITE(thefile,m,1, MPI_INTEGER, & 
+                        MPI_STATUS_IGNORE, ierr) 
+
+                disp = disp + 4
+
+
+! data
+       BUFSIZE = BUFSIZE*m 
+
+           
+     call MPI_FILE_SET_VIEW(thefile, disp, MPI_REAL, & 
+                           MPI_REAL, 'native', & 
+                           MPI_INFO_NULL, ierr) 
+    call MPI_FILE_WRITE(thefile,mesh_init(nb:ne,:),BUFSIZE, MPI_REAL, & 
+                        MPI_STATUS_IGNORE, ierr) 
+
 
  if ( rank == 0 ) then 
  write(*,*) "calculation time step", i_step , "finished"
@@ -306,33 +364,8 @@ enddo
  deallocate( matrix )
  deallocate( tab )
 
-!write(*,*) "je suis le proc : " , rank, " je calcul de : ", begin_iter, "à ", end_iter 
-        
- !       do i = 0, BUFSIZE 
- !       buf(i) = 'b' 
- !   enddo 
- !   call MPI_FILE_OPEN(MPI_COMM_WORLD, 'testfile', & 
- !                      MPI_MODE_WRONLY + MPI_MODE_CREATE, & 
- !                      MPI_INFO_NULL, thefile, ierr) 
-    ! assume 4-byte integers 
- !   disp = rank * BUFSIZE * 4 
- !   call MPI_FILE_SET_VIEW(thefile, disp, MPI_INTEGER, & 
- !                          MPI_CHAR, 'native', & 
- !                          MPI_INFO_NULL, ierr) 
- !   call MPI_FILE_WRITE(thefile, buf, BUFSIZE, MPI_CHAR, & 
- !                       MPI_STATUS_IGNORE, ierr) 
- !   call MPI_FILE_CLOSE(thefile, ierr) 
-
-
-! print message to screen
-
-!if (rank == 0 ) then 
-!      write(*,*) 'Hello World!'
-!endif
-
-
-
-
+ call MPI_FILE_CLOSE(thefile, ierr)
+ 
 end subroutine
 
 !*************************************************************************

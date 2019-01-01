@@ -1,29 +1,70 @@
 program quantSolver 
-!use heatEquation 
 use linearAlgebra
 use mpi
 use para 
+USE ISO_FORTRAN_ENV, ONLY : ERROR_UNIT ! access computing environment
 implicit none 
 REAL :: start, finish
 CHARACTER (len =100) cal_type
-character(len=100) :: file_name
-INTEGER :: READ_UNIT  
-
+character(len=100) :: file_name_input  
+character(len=100) :: file_name_output
+INTEGER :: READ_UNIT
+character (len=100) :: argv
+INTEGER*4 i, iargc, numarg
 
 
 call mpi_init(ierr)
-
-call get_command_argument(1, file_name)
-
 call MPI_COMM_SIZE(MPI_COMM_WORLD, numprocs, ierr)
 call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
 
-READ_UNIT = rank+100
+          numarg = iargc()
+i=1
 
-open(unit=READ_UNIT, file=file_name, form="formatted")
+
+        if ( numarg == 0 ) then 
+
+        if (rank == 0 ) then 
+        write(*,*) " usage : linear_solver -opt <o1> <o2> [...]" 
+        endif
+
+        call mpi_finalize(ierr)
+        call exit()
+
+endif 
+
+    do while ( i <= numarg )
+    call getarg( i, argv )
+
+       select case (argv)
+
+       case ('-in')
+              i=i+1 
+              call getarg(i,file_name_input)
+
+        case ('-out') 
+              i=i+1
+              call getarg(i,file_name_output)
+
+ 
+               
+      case default
+              if (rank == 0 ) then      
+          WRITE(ERROR_UNIT,*)"argument : ", argv, " unknown" 
+              endif 
+
+          call mpi_finalize(ierr)
+          call exit() 
+
+       endselect     
+
+          
+        i=i+1
+
+    enddo 
 
 
-if ( rank == 0 ) then 
+    if ( rank == 0 ) then 
+
              write(*,*) "------------------------------------------------------------------"
              write(*,*) "                       Linear Algebra Solver                      "
              write(*,*) "                           version 1.0                            "      
@@ -31,16 +72,17 @@ if ( rank == 0 ) then
              write(*,*) " created and implemented by : Julien Versaci                      "
              write(*,*) " demonstration                                                    "
              write(*,*) "------------------------------------------------------------------"
+endif
 
-             
-         start= MPI_Wtime()     !cpu_time(start)
-endif              
-             
+
+READ_UNIT = rank+100            
+open(unit=READ_UNIT, file=file_name_input, form="formatted")
+
+          start= MPI_Wtime()     
+         
 
 
              read(READ_UNIT,*) cal_type
-
-
 
               
              if ( cal_type == "HEAT_EQUATION") then        
@@ -54,8 +96,11 @@ endif
                    CALL EXIT(1)  
              endif 
 
-  if ( rank == 0 ) then                     
-         finish= MPI_Wtime()     !cpu_time(start)
+if ( rank == 0 ) then         
+
+ call write_in_ascii_file("testfile",file_name_output) 
+
+         finish= MPI_Wtime()     
 
              
             write(*,*) "------------------------------------------------------------------"
