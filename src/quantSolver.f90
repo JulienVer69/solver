@@ -1,14 +1,16 @@
 program quantSolver 
 use linearAlgebra
 use mpi
-use para 
-USE ISO_FORTRAN_ENV, ONLY : ERROR_UNIT ! access computing environment
+use para
+use writeData
+USE ISO_FORTRAN_ENV, ONLY : ERROR_UNIT,OUTPUT_UNIT ! access computing environment
 implicit none 
 REAL :: start, finish
 CHARACTER (len =100) cal_type
 character(len=100) :: file_name_input  
 character(len=100) :: file_name_output
 INTEGER :: READ_UNIT
+INTEGER :: WRITE_UNIT 
 character (len=100) :: argv
 INTEGER*4 i, iargc, numarg
 
@@ -16,6 +18,8 @@ INTEGER*4 i, iargc, numarg
 call mpi_init(ierr)
 call MPI_COMM_SIZE(MPI_COMM_WORLD, numprocs, ierr)
 call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+WRITE_UNIT = OUTPUT_UNIT 
+
 
           numarg = iargc()
 i=1
@@ -44,9 +48,10 @@ endif
         case ('-out') 
               i=i+1
               call getarg(i,file_name_output)
-
+              WRITE_UNIT = 2589 
+              open(unit=WRITE_UNIT, file=file_name_output, form="formatted")
  
-               
+                
       case default
               if (rank == 0 ) then      
           WRITE(ERROR_UNIT,*)"argument : ", argv, " unknown" 
@@ -96,11 +101,13 @@ open(unit=READ_UNIT, file=file_name_input, form="formatted")
                    CALL EXIT(1)  
              endif 
 
-if ( rank == 0 ) then         
 
- call write_in_ascii_file("testfile",file_name_output) 
+             finish= MPI_Wtime()     
+             
+ if ( rank == 0 ) then         
 
-         finish= MPI_Wtime()     
+ call write_data("testfile",WRITE_UNIT) 
+
 
              
             write(*,*) "------------------------------------------------------------------"
@@ -111,6 +118,7 @@ if ( rank == 0 ) then
             write(*,*) "------------------------------------------------------------------"
 
 endif
+
 
 call mpi_finalize(ierr)
                

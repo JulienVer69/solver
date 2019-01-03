@@ -4,17 +4,14 @@ module writeData
 
         CONTAINS 
 
- subroutine write_in_ascii_file(file_name_in,file_name_out) 
-  CHARACTER (len=*), INTENT(IN) :: file_name_in        
-  CHARACTER (len=*), INTENT(IN) :: file_name_out          
-  INTEGER, PARAMETER :: WRITE_UNIT = 116   
+ subroutine write_data(file_name_in,WRITE_UNIT) 
+  CHARACTER (len=*), INTENT(IN) :: file_name_in                     
   REAL, dimension(:,:), allocatable :: data_write   
   INTEGER :: TS,NUMB,i, i_step,j
   INTEGER :: nc,nl 
   INTEGER :: BUFSIZE, thefile   
 
- open(unit=WRITE_UNIT, file=file_name_out, form="formatted")
-
+ 
 
 call MPI_FILE_OPEN(MPI_COMM_SELF,file_name_in, & 
              MPI_MODE_RDONLY, & 
@@ -39,6 +36,7 @@ call MPI_FILE_READ(thefile,nl,1,MPI_INTEGER,&
 call MPI_FILE_READ(thefile,nc,1,MPI_INTEGER,& 
     MPI_STATUS_IGNORE, ierr )  
 
+ 
  BUFSIZE = nl*nc 
  allocate(data_write(nl,nc))
 
