@@ -1,10 +1,10 @@
 module writeData  
-    use para
+    use globvariables
       IMPLICIT NONE 
 
         CONTAINS 
 
- subroutine write_data(file_name_in,WRITE_UNIT) 
+ subroutine write_data(file_name_in) 
   CHARACTER (len=*), INTENT(IN) :: file_name_in                     
   REAL, dimension(:,:), allocatable :: data_write   
   INTEGER :: TS,NUMB,i, i_step,j

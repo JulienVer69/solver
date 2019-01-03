@@ -1,6 +1,6 @@
-module linearAlgebra  
+module adi2DMethod  
     use linearSystemSolver
-    use para
+    use globVariables 
       IMPLICIT NONE  
 
 
@@ -46,11 +46,11 @@ subroutine read_data(READ_UNIT)
       alpha = (dif*delta_t)/(2.0*delta_x*delta_y) 
 
       if ( rank == 0 ) then 
-      write(*,*) "HEAT EQUATION SOLVER"
-      write(*,*) "parameters of the equation :"
-      write(*,*) "thermal diffusivity :" , dif , "m^2/s"
-      write(*,*) "coeff :" , alpha
-      write(*,*) "------------------------------------------------------------------"
+      write(WRITE_UNIT,*) "HEAT EQUATION SOLVER"
+      write(WRITE_UNIT,*) "parameters of the equation :"
+      write(WRITE_UNIT,*) "thermal diffusivity :" , dif , "m^2/s"
+      write(WRITE_UNIT,*) "coeff :" , alpha
+      write(WRITE_UNIT,*) "------------------------------------------------------------------"
       endif  
        
       cl_north = cl_north +273
@@ -70,9 +70,9 @@ end subroutine
  subroutine start_solver()
 
 if ( rank == 0 ) then 
-write(*,*) "         number of points to compute : ", (n-2)*(m-2) 
-write(*,*) "         number of process : " , numprocs   
-write(*,*) "------------------------------------------------------------------"
+write(WRITE_UNIT,*) "         number of points to compute : ", (n-2)*(m-2) 
+write(WRITE_UNIT,*) "         number of process : " , numprocs   
+write(WRITE_UNIT,*) "------------------------------------------------------------------"
                    
 endif 
   
@@ -153,8 +153,8 @@ INTEGER :: offset
 INTEGER :: nl,nc,TS,NUMB 
 
 if ( rank == 0 ) then 
-write(*,*) "method of resolution : Alternating direction implicit method (2-D)"
-write(*,*) "------------------------------------------------------------------"
+write(WRITE_UNIT,*) "method of resolution : Alternating direction implicit method (2-D)"
+write(WRITE_UNIT,*) "------------------------------------------------------------------"
 endif 
 
 
@@ -407,7 +407,7 @@ deallocate( local_mesh )
 
                 
  if ( rank == 0 ) then 
- write(*,*) "calculation time step", i_step , "finished"
+ write(WRITE_UNIT,*) "calculation time step", i_step , "finished"
 endif 
 
 enddo 

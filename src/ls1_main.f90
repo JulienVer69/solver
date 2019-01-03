@@ -1,7 +1,7 @@
-program quantSolver 
-use linearAlgebra
+program main  
+use adi2DMethod 
 use mpi
-use para
+use globVariables 
 use writeData
 USE ISO_FORTRAN_ENV, ONLY : ERROR_UNIT,OUTPUT_UNIT ! access computing environment
 implicit none 
@@ -10,7 +10,6 @@ CHARACTER (len =100) cal_type
 character(len=100) :: file_name_input  
 character(len=100) :: file_name_output
 INTEGER :: READ_UNIT
-INTEGER :: WRITE_UNIT 
 character (len=100) :: argv
 INTEGER*4 i, iargc, numarg
 
@@ -20,6 +19,10 @@ call MPI_COMM_SIZE(MPI_COMM_WORLD, numprocs, ierr)
 call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
 WRITE_UNIT = OUTPUT_UNIT 
 
+
+!*****************************************************
+!            READING PROGRAM'S ARGUEMENTS 
+!*****************************************************
 
           numarg = iargc()
 i=1
@@ -57,6 +60,7 @@ endif
           WRITE(ERROR_UNIT,*)"argument : ", argv, " unknown" 
               endif 
 
+
           call mpi_finalize(ierr)
           call exit() 
 
@@ -67,16 +71,17 @@ endif
 
     enddo 
 
+!*********************************************************************    
 
     if ( rank == 0 ) then 
 
-             write(*,*) "------------------------------------------------------------------"
-             write(*,*) "                       Linear Algebra Solver                      "
-             write(*,*) "                           version 1.0                            "      
-             write(*,*) "                                                                  "      
-             write(*,*) " created and implemented by : Julien Versaci                      "
-             write(*,*) " demonstration                                                    "
-             write(*,*) "------------------------------------------------------------------"
+             write(WRITE_UNIT,*) "------------------------------------------------------------------"
+             write(WRITE_UNIT,*) "                       Linear Algebra Solver                      "
+             write(WRITE_UNIT,*) "                           version 1.0                            "      
+             write(WRITE_UNIT,*) "                                                                  "      
+             write(WRITE_UNIT,*) " created and implemented by : Julien Versaci                      "
+             write(WRITE_UNIT,*) " demonstration                                                    "
+             write(WRITE_UNIT,*) "------------------------------------------------------------------"
 endif
 
 
@@ -97,7 +102,7 @@ open(unit=READ_UNIT, file=file_name_input, form="formatted")
 
 
              else   
-                   write(*,*) "calculation label unknown"
+                   write(WRITE_UNIT,*) "calculation label unknown"
                    CALL EXIT(1)  
              endif 
 
@@ -106,16 +111,16 @@ open(unit=READ_UNIT, file=file_name_input, form="formatted")
              
  if ( rank == 0 ) then         
 
- call write_data("testfile",WRITE_UNIT) 
+ call write_data("testfile") 
 
 
              
-            write(*,*) "------------------------------------------------------------------"
-            write(*,*) " Simulation time :                                                " 
-            print '("Time = ",f6.6," seconds.")',finish-start
-            write(*,*) "------------------------------------------------------------------"
-            write(*,*) "                       END OF PROGRAM                             "
-            write(*,*) "------------------------------------------------------------------"
+            write(WRITE_UNIT,*) "------------------------------------------------------------------"
+            write(WRITE_UNIT,*) " Simulation time :                                                " 
+           ! print '("Time = ",f6.6," seconds.")',finish-start
+            write(WRITE_UNIT,*) "------------------------------------------------------------------"
+            write(WRITE_UNIT,*) "                       END OF PROGRAM                             "
+            write(WRITE_UNIT,*) "------------------------------------------------------------------"
 
 endif
 
@@ -123,5 +128,5 @@ endif
 call mpi_finalize(ierr)
                
 
-end program quantsolver 
+end program  
 
