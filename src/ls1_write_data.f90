@@ -57,7 +57,6 @@ enddo
 enddo 
 
   call MPI_FILE_CLOSE(thefile, ierr)
-  close(WRITE_UNIT) 
 endsubroutine       
 
 

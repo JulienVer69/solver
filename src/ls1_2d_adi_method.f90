@@ -12,6 +12,7 @@ module adi2DMethod
       REAL, dIMENSION(:,:), ALLOCATABLE :: mesh_sol   
       REAL  ::  cl_north,cl_south,cl_east,cl_west
       REAL  :: alpha, lambda,rho,dif,cap
+      REAL :: init_value
       REAL  ::  dim_x , delta_x, dim_y,  delta_y , dim_t, delta_t
       INTEGER :: time_step  
       INTEGER :: rest_x,rest_y  
@@ -24,20 +25,104 @@ module adi2DMethod
 !  name : read data 
 !*************************************************************************
                 
-subroutine read_data(READ_UNIT)  
-         INTEGER, INTENT(IN) :: READ_UNIT  
+subroutine read_data()  
+ INTEGER :: stat 
+ character(len=100) :: line
       
-      read(READ_UNIT,*) dim_x , n 
-      read(READ_UnIT,*) dim_y,  m 
-      read(READ_UNIT,*) dim_t, time_step 
-      read(READ_UNIT,*) lambda 
-      read(READ_UNIT,*) rho
-      read(READ_UNIT,*) cap
-      read(READ_UNIT,*) cl_north, cl_south, cl_east, cl_west
+      dim_x = .0
+      dim_y = .0 
+      dim_t = .0 
+      n = 0 
+      m = 0
+      rho = .0
+      cap = .0 
+      lambda = .0 
+      cl_east = .0
+      cl_west = .0 
+      cl_south = .0 
+      cl_north = .0 
+      
+          
+
+      
+  DO WHILE (.TRUE.) 
+              READ(READ_UNIT, *, IOSTAT=stat) line 
+              IF(IS_IOSTAT_END(stat)) EXIT 
+
+           SELECT CASE (line) 
+          
+           
+               case("GEOMETRY_RECTANGLE") 
+                  
+                      READ(READ_UNIT,*) dim_x,dim_y
+
+               case("CARTESIAN_GRID") 
+                  
+                      READ(READ_UNIT,*) n,m
+
+               case("TIME_DEPENDANT") 
+                 
+                      READ(READ_UNIT,*) dim_t, time_step  
+
+                        
 
 
+               case("BOUNDARY_CONDITION") 
+                 
+                      READ(READ_UNIT,*) cl_east,cl_west,cl_north, cl_south
+                              
+
+               case ("INIT_ALL_GRID") 
+
+                      READ(READ_UNIT,*) init_value 
+
+                case ("PHYSICS_HEAT") 
+
+                      READ(READ_UNIT,*) lambda,rho,cap
+
+                        
+                case default  
+
+                      write(WRITE_UNIT,*) "unknown data set element" 
+
+                end select  
+   
+      enddo 
 
       close(READ_UNIT)  
+! control
+
+  if ( lambda == .0 .or. rho == .0 .or. cap == .0 ) then 
+                                write(*,*) "bad constants"
+                                call mpi_finalize(ierr)
+                                call exit   
+  endif
+
+
+ if ( dim_t == .0 .or. time_step == 0 ) then 
+
+                                write(*,*) "bad time discretization"
+                                call mpi_finalize(ierr)
+                                call exit   
+      endif
+
+
+
+ if ( n == 0 .or. m == 0 ) then 
+                              write(*,*) "bad domain discretization"
+                              call mpi_finalize(ierr)
+                              call exit   
+ endif
+
+  if ( dim_x == .0 .or. dim_y == .0 ) then 
+                              write(*,*) "bad domain definition"
+                              call mpi_finalize(ierr)
+                              call exit   
+   endif
+
+
+
+
  
       delta_x = dim_x/(1.0*n) 
       delta_y = dim_y/(1.0*m) 
@@ -53,13 +138,6 @@ subroutine read_data(READ_UNIT)
       write(WRITE_UNIT,*) "------------------------------------------------------------------"
       endif  
        
-      cl_north = cl_north +273
-      cl_south = cl_south +273
-      cl_east  = cl_east + 273
-      cl_west  = cl_west + 273
-
-    
-
 end subroutine 
 
 !*************************************************************************
@@ -114,7 +192,7 @@ end subroutine
 
 subroutine mesh_initialization()
 
-                mesh_init = 293.
+                mesh_init = init_value 
                 mesh_init(:,1) = cl_west                 
                 mesh_init(:,m) = cl_east                 
            

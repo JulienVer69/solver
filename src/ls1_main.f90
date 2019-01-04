@@ -9,7 +9,6 @@ REAL :: start, finish
 CHARACTER (len =100) cal_type
 character(len=100) :: file_name_input  
 character(len=100) :: file_name_output
-INTEGER :: READ_UNIT
 character (len=100) :: argv
 INTEGER*4 i, iargc, numarg
 
@@ -89,22 +88,16 @@ READ_UNIT = rank+100
 open(unit=READ_UNIT, file=file_name_input, form="formatted")
 
           start= MPI_Wtime()     
-         
+     
 
 
-             read(READ_UNIT,*) cal_type
 
               
-             if ( cal_type == "HEAT_EQUATION") then        
-                CALL read_data(READ_UNIT)
+                CALL read_data()
                 call start_solver()
 
 
 
-             else   
-                   write(WRITE_UNIT,*) "calculation label unknown"
-                   CALL EXIT(1)  
-             endif 
 
 
              finish= MPI_Wtime()     
@@ -122,6 +115,9 @@ open(unit=READ_UNIT, file=file_name_input, form="formatted")
             write(WRITE_UNIT,*) "                       END OF PROGRAM                             "
             write(WRITE_UNIT,*) "------------------------------------------------------------------"
 
+
+            
+  CLOSE(WRITE_UNIT) 
 endif
 
 
