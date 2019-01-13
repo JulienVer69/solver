@@ -11,7 +11,7 @@ character(len=100) :: file_name_input
 character(len=100) :: file_name_output
 character (len=100) :: argv
 INTEGER*4 i, iargc, numarg
-
+LOGICAL :: file_exists, flag_help 
 
 call mpi_init(ierr)
 call MPI_COMM_SIZE(MPI_COMM_WORLD, numprocs, ierr)
@@ -26,17 +26,36 @@ WRITE_UNIT = OUTPUT_UNIT
           numarg = iargc()
 i=1
 
+        
+         call getarg( 1, argv )
+         if ( argv =="--help") then 
+                 flag_help = .TRUE.
+         endif 
 
-        if ( numarg == 0 ) then 
+        if ( numarg == 0 .or. flag_help ) then 
 
         if (rank == 0 ) then 
-        write(ERROR_UNIT,*) " usage : linear_solver -opt <o1> <o2> [...]" 
-        endif
+        write(OUTPUT_UNIT,*) "************************************************************"
+        write(OUTPUT_UNIT,*) "* usage : linear_solver -opt <o1> <o2> [...]               *" 
+        write(OUTPUT_UNIT,*) "* ---------------------------------------------------------*"
+        write(OUTPUT_UNIT,*) "*                      Quick Start :                       *"
+        write(OUTPUT_UNIT,*) "*                      ===========                         *"
+        write(OUTPUT_UNIT,*) "* Mandatory argument   :                                   *"
+        write(OUTPUT_UNIT,*) "* ==================                                       *"
+        write(OUTPUT_UNIT,*) "*                                                          *"
+        write(OUTPUT_UNIT,*) "* -in  <file_name>  ------------------ input data set file *"
+        write(OUTPUT_UNIT,*) "*                                                          *"
+        write(OUTPUT_UNIT,*) "*Recommended argument :                                    *"                                   
+        write(OUTPUT_UNIT,*) "*====================                                      *"
+        write(OUTPUT_UNIT,*) "*                                                          *"
+        write(OUTPUT_UNIT,*) "*-out <file_name>  ------------------ output data file     *"    
+        write(OUTPUT_UNIT,*) "*                                                          *"
+        write(OUTPUT_UNIT,*) "************************************************************"
+endif
 
         call mpi_finalize(ierr)
         call exit()
-
-endif 
+        endif 
 
     do while ( i <= numarg )
     call getarg( i, argv )
@@ -46,6 +65,7 @@ endif
        case ('-in')
               i=i+1 
               call getarg(i,file_name_input)
+
 
         case ('-out') 
               i=i+1
@@ -72,7 +92,11 @@ endif
 
 !*********************************************************************    
 
-    if ( rank == 0 ) then 
+    if ( rank == 0 ) then
+
+
+       
+              
 
              write(WRITE_UNIT,*) "------------------------------------------------------------------"
              write(WRITE_UNIT,*) "                       Linear Algebra Solver                      "
@@ -85,9 +109,19 @@ endif
 
 
 READ_UNIT = rank+100            
-open(unit=READ_UNIT, file=file_name_input, form="formatted")
+INQUIRE(FILE=file_name_input, EXIST=file_exists)
 
-          start= MPI_Wtime()     
+if ( file_exists ) then 
+open(unit=READ_UNIT, file=file_name_input, form="formatted")
+else 
+        WRITE(ERROR_UNIT,*)"can't open or find the data set file"
+        CALL mpi_finalize(ierr)
+        CALL exit()
+endif   
+
+CALL MPI_Barrier(MPI_COMM_WORLD,ierr) 
+
+start= MPI_Wtime()     
      
 
 
