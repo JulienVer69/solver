@@ -25,7 +25,7 @@ module adi2DMethod
 !  name : read data 
 !*************************************************************************
                 
-subroutine read_data()  
+subroutine adi_2d_read_data()  
  INTEGER :: stat 
  character(len=100) :: line
       
@@ -128,13 +128,11 @@ subroutine read_data()
       delta_y = dim_y/(1.0*m) 
       delta_t = dim_t/(1.0*time_step) 
       dif = lambda/(rho*cap) 
-      alpha = (dif*delta_t)/(2.0*delta_x*delta_y) 
 
       if ( rank == 0 ) then 
       write(WRITE_UNIT,*) "HEAT EQUATION SOLVER"
       write(WRITE_UNIT,*) "parameters of the equation :"
       write(WRITE_UNIT,*) "thermal diffusivity :" , dif , "m^2/s"
-      write(WRITE_UNIT,*) "coeff :" , alpha
       write(WRITE_UNIT,*) "------------------------------------------------------------------"
       endif  
        
@@ -145,7 +143,7 @@ end subroutine
 ! name : start_solver  
 !*************************************************************************
 
- subroutine start_solver()
+ subroutine adi_2d_start_solver()
 
 if ( rank == 0 ) then 
 write(WRITE_UNIT,*) "         number of points to compute : ", (n-2)*(m-2) 
@@ -181,7 +179,7 @@ endif
       
          np = niter_y+2 
 
-         call adi_method() 
+         call adi_2d_simulation() 
 
 end subroutine
 
@@ -190,7 +188,7 @@ end subroutine
 ! name : mesh_initilialization  
 !*************************************************************************
 
-subroutine mesh_initialization()
+subroutine adi_2d_mesh_initialization()
 
                 mesh_init = init_value 
                 mesh_init(:,1) = cl_west                 
@@ -216,7 +214,7 @@ end subroutine
 !*************************************************************************
 
 
-subroutine adi_method() 
+subroutine adi_2d_simulation() 
 integer BUFSIZE, thefile 
 integer(kind=MPI_OFFSET_KIND) disp  
 REAL, dimension(:,:), allocatable ::  local_mesh
@@ -230,6 +228,7 @@ INTEGER :: mesh_init_cursor, local_mesh_cursor, write_cursor
 INTEGER :: offset  
 INTEGER :: nl,nc,TS,NUMB 
 
+
 if ( rank == 0 ) then 
 write(WRITE_UNIT,*) "method of resolution : Alternating direction implicit method (2-D)"
 write(WRITE_UNIT,*) "------------------------------------------------------------------"
@@ -239,7 +238,7 @@ endif
 
 allocate(mesh_init(np,m))
 
-call mesh_initialization() 
+call adi_2d_mesh_initialization() 
 
 ! We create a binary file to save the results of the calculation in parallel 
 ! each task will write his results in a specific location of the file :
@@ -281,7 +280,7 @@ local_mesh(2:np-1,m) = mesh_init(2:np-1,m)
 local_mesh(2:np-1,1) = mesh_init(2:np-1,1)
 
            do i =2,niter_y+1
-               CALL adi_method_init(1,i,tab,matrix)
+               CALL adi_2d_arrays_init(1,i,tab,matrix)
                CALL lapack_solver(matrix,tab,m-2,1)
                local_mesh(i,2:m-1) = tab
            enddo
@@ -368,7 +367,7 @@ local_mesh(2:n-1,mp) = mesh_init(2:n-1,mp)
 local_mesh(2:n-1,1) = mesh_init(2:n-1,1)
        
             do i =2,niter_x+1
-               CALL adi_method_init(2,i,tab,matrix)
+               CALL adi_2d_arrays_init(2,i,tab,matrix)
                CALL lapack_solver(matrix,tab,n-2,1)
                local_mesh(2:n-1,i) = tab
             enddo
@@ -504,7 +503,7 @@ end subroutine
 !*************************************************************************
 
 
-subroutine adi_method_init(step,line,tab,matrix) 
+subroutine adi_2d_arrays_init(step,line,tab,matrix) 
 INTEGER :: step
 REAL :: tab(:) 
 REAL :: matrix(:,:) 
@@ -516,68 +515,72 @@ tab =0.
 
 if ( step == 1) then
 
+ 
+        alpha = (dif*delta_t)/(2.0*delta_x*delta_x) 
+
 do i = 1,m-2           
    do j=1,m-2
       
    if ( i == j ) then 
-         matrix(i,j) = 1.0 +4.0*alpha  
+         matrix(i,j) = 1.0 +2.0*alpha  
       end if
       if (j == i+1 .and. i < m-2 ) then  
-         matrix(i,j) = -2.0*alpha 
+         matrix(i,j) = -1.0*alpha 
       end if
       if (  j == i-1 .and. i>1 ) then 
-         matrix(i,j) = -2.0*alpha 
+         matrix(i,j) = -1.0*alpha 
       end if
     enddo
 enddo
 
 
 ! time 
-     tab(:) = (1-4.0*alpha)*mesh_init(line,2:m-1) 
+     tab(:) = (1-2.0*alpha)*mesh_init(line,2:m-1) 
 
 ! top side  
-     tab(:) = tab(:) + 2.0*alpha*mesh_init(line-1,2:m-1) 
+     tab(:) = tab(:) + 1.0*alpha*mesh_init(line-1,2:m-1) 
 
 ! lower side  
-     tab(:) = tab(:) + 2.0*alpha*mesh_init(line+1,2:m-1)
+     tab(:) = tab(:) + 1.0*alpha*mesh_init(line+1,2:m-1)
 
 ! left side 
-     tab(1) = tab(1) +  2.0*alpha*mesh_init(line,1)
+     tab(1) = tab(1) +  1.0*alpha*mesh_init(line,1)
 
 ! right side 
-     tab(m-2) = tab(m-2) +  2.0*alpha*mesh_init(line,m)
+     tab(m-2) = tab(m-2) +  1.0*alpha*mesh_init(line,m)
 endif 
 
 if ( step == 2) then  
 
-do i = 1,n-2           
+        alpha = (dif*delta_t)/(2.0*delta_y*delta_y) 
+
+ do i = 1,n-2           
    do j=1,n-2
       
     if ( i == j ) then 
-         matrix(i,j) = 1.0 +4.0*alpha  
+         matrix(i,j) = 1.0 +2.0*alpha  
       end if
       if (j == i+1 .and. i < n-2 ) then  
-         matrix(i,j) = -2.0*alpha 
+         matrix(i,j) = -1.0*alpha 
       end if
       if (  j == i-1 .and. i>1 ) then 
-         matrix(i,j) = -2.0*alpha 
+         matrix(i,j) = -1.0*alpha 
       end if
     enddo
 enddo
                         
 ! time 
-     tab(:) = (1-4.0*alpha)*mesh_init(2:n-1,line) 
+     tab(:) = (1-2.0*alpha)*mesh_init(2:n-1,line) 
 ! left side  
-     tab(:) = tab(:) + 2.0*alpha*mesh_init(2:n-1,line-1) 
+     tab(:) = tab(:) + 1.0*alpha*mesh_init(2:n-1,line-1) 
 ! right side  
-     tab(:) = tab(:) + 2.0*alpha*mesh_init(2:n-1,line+1)
+     tab(:) = tab(:) + 1.0*alpha*mesh_init(2:n-1,line+1)
 ! top of the grid  
-     tab(1) = tab(1) +  2.0*alpha*mesh_init(1,line)
+     tab(1) = tab(1) +  1.0*alpha*mesh_init(1,line)
 ! bottom of the grid 
-     tab(n-2) = tab(n-2) +  2.0*alpha*mesh_init(n,line)
+     tab(n-2) = tab(n-2) +  1.0*alpha*mesh_init(n,line)
 endif 
 
 end subroutine 
-
 
 end module 

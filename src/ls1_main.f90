@@ -30,7 +30,7 @@ i=1
         if ( numarg == 0 ) then 
 
         if (rank == 0 ) then 
-        write(*,*) " usage : linear_solver -opt <o1> <o2> [...]" 
+        write(ERROR_UNIT,*) " usage : linear_solver -opt <o1> <o2> [...]" 
         endif
 
         call mpi_finalize(ierr)
@@ -93,8 +93,8 @@ open(unit=READ_UNIT, file=file_name_input, form="formatted")
 
 
               
-                CALL read_data()
-                call start_solver()
+                CALL adi_2d_read_data()
+                call adi_2d_start_solver()
 
 
 
